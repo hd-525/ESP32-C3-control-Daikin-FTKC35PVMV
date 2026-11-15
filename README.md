@@ -1,4 +1,4 @@
-# ESP32-C3-i-u-khi-n-Daikin-FTKC35PVMV
+# ESP32-C3-điều khiển-Daikin-FTKC35PVMV
 Dưới đây là dự án riêng biệt cho ESP32-C3 điều khiển Daikin FTKC35PVMV qua UART → MAX485 → level shift 3.3V → dây P1/P2 (DIII-NET).
 1. Lưu ý phần cứng
 thành phần	chi tiết
@@ -25,6 +25,6 @@ Thay các mảng {0xXX, ...} bằng frame thực tế bạn đã quét được.
 4. Cách lấy frame thực tế và hoàn thiện code
 Chạy sniffer → bấm nút remote → copy các dòng RX 0x.. ra file văn bản.
 Nhận dạng frame: Một bấm nút thường là một chuỗi byte có đầu/cuối cố định (ví dụ 0xAA ... 0xEE). Nhóm các byte theo burst.
-Điền vào daikin_control.yaml: Thay {0xXX, 0xXX, 0xXX} bằng mảng byte thực tế cho từng nút (Bật, Tắt, Làm mát, Sưởi, Nhiệt độ, Swing...).
+Điền vào file: daikin_control.yaml. Thay {0xXX, 0xXX, 0xXX} bằng mảng byte thực tế cho từng nút (Bật, Tắt, Làm mát, Sưởi, Nhiệt độ, Swing...).
 Viết parser nhận (2-way): Trong đoạn while (id(uart_daikin).available()), lắp ráp frame từ các byte đến, kiểm tra byte địa chỉ/lệnh của máy trong, rồi cập nhật id(daikin_power), id(daikin_temp), v.v. và gọi publish_state() để Home Assistant cập nhật ngay lập tức.
 Nạp và kiểm tra: Trong Home Assistant sẽ hiện các entity: switch điện, select chế độ/gió, number nhiệt độ, text sensor trạng thái.
