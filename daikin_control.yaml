@@ -1,0 +1,290 @@
+esphome:
+  name: daikin-ftkc35pvmv
+  friendly_name: Daikin FTKC35PVMV
+
+esp32:
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+  baud_rate: 0
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  manual_ip:
+    static_ip: 192.168.1.82
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+  ap:
+    ssid: "daikin-control"
+    password: "12345678"
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: "TheyC99XeQcguRhqrwiyxw2J0Bqq5NYS/kpWR0DlMPA="
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+web_server:
+  port: 80
+  version: 3
+
+uart:
+  id: uart_daikin
+  tx_pin: GPIO18
+  rx_pin: GPIO19
+  baud_rate: 9600
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+  rx_buffer_size: 256
+
+# Chuyển MAX485 giữa gửi/nhận (nếu dùng GPIO21 cho DE/RE)
+output:
+  - platform: gpio
+    id: rs485_de_re
+    pin: GPIO21
+
+globals:
+  - id: daikin_power
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: daikin_mode
+    type: std::string
+    restore_value: no
+    initial_value: '"OFF"'
+
+  - id: daikin_temp
+    type: float
+    restore_value: no
+    initial_value: "25"
+
+  - id: daikin_fan
+    type: std::string
+    restore_value: no
+    initial_value: '"Auto"'
+
+  - id: daikin_swing
+    type: bool
+    restore_value: no
+    initial_value: "false"
+
+  - id: rx_buffer
+    type: std::string
+    restore_value: no
+
+switch:
+  - platform: template
+    id: daikin_power_switch
+    name: "Điều hòa - Điện"
+    icon: "mdi:power"
+
+    turn_on_action:
+      - lambda: |-
+          id(rs485_de_re).turn_on();
+          delay(5);
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: frame BẬT thực tế
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_power) = true;
+          ESP_LOGI("DAIKIN", "Sent POWER ON");
+
+    turn_off_action:
+      - lambda: |-
+          id(rs485_de_re).turn_on();
+          delay(5);
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: frame TẮT thực tế
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_power) = false;
+          ESP_LOGI("DAIKIN", "Sent POWER OFF");
+
+  - platform: template
+    id: daikin_swing_switch
+    name: "Điều hòa - Swing"
+    icon: "mdi:air-balancer"
+
+    turn_on_action:
+      - lambda: |-
+          id(rs485_de_re).turn_on();
+          delay(5);
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: frame SWING ON
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_swing) = true;
+
+    turn_off_action:
+      - lambda: |-
+          id(rs485_de_re).turn_on();
+          delay(5);
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: frame SWING OFF
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_swing) = false;
+
+select:
+  - platform: template
+    id: daikin_mode_select
+    name: "Điều hòa - Chế độ"
+    options:
+      - "Tự động"
+      - "Làm mát"
+      - "Sưởi"
+      - "Giữ ấm"
+      - "Quạt"
+    initial_option: "Tự động"
+
+    lambda: |-
+      return id(daikin_mode);
+
+    action:
+      - lambda: |-
+          std::string mode = x;
+          id(rs485_de_re).turn_on();
+          delay(5);
+          if (mode == "Làm mát") {
+            std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: COOL
+            id(uart_daikin).write(data);
+          } else if (mode == "Sưởi") {
+            std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: HEAT
+            id(uart_daikin).write(data);
+          } else if (mode == "Giữ ấm") {
+            std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: DRY
+            id(uart_daikin).write(data);
+          } else if (mode == "Quạt") {
+            std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: FAN
+            id(uart_daikin).write(data);
+          } else {
+            std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX}; // TODO: AUTO
+            id(uart_daikin).write(data);
+          }
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_mode) = mode;
+          ESP_LOGI("DAIKIN", "Sent MODE %s", mode.c_str());
+
+  - platform: template
+    id: daikin_fan_select
+    name: "Điều hòa - Gió"
+    options:
+      - "Tự động"
+      - "Thấp"
+      - "Trung bình"
+      - "Cao"
+      - "Tăng lực"
+    initial_option: "Tự động"
+
+    lambda: |-
+      return id(daikin_fan);
+
+    action:
+      - lambda: |-
+          std::string fan = x;
+          id(rs485_de_re).turn_on();
+          delay(5);
+          // TODO:Thay bằng frame gió thực tế
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX};
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_fan) = fan;
+
+number:
+  - platform: template
+    id: daikin_temp_number
+    name: "Điều hòa - Nhiệt độ"
+    min_value: 17
+    max_value: 30
+    step: 1
+    initial_value: 25
+
+    lambda: |-
+      return id(daikin_temp);
+
+    set_action:
+      - lambda: |-
+          float t = x;
+          id(rs485_de_re).turn_on();
+          delay(5);
+          // TODO:Thay bằng frame nhiệt độ thực tế (thường là byte 1 byte temperature)
+          std::vector<uint8_t> data = {0xXX, 0xXX, 0xXX, (uint8_t)t};
+          id(uart_daikin).write(data);
+          delay(5);
+          id(rs485_de_re).turn_off();
+          id(daikin_temp) = t;
+          ESP_LOGI("DAIKIN", "Sent TEMP %.0f", t);
+
+sensor:
+  - platform: template
+    id: daikin_temp_sensor
+    name: "Điều hòa - Nhiệt độ hiện tại"
+    unit_of_measurement: "°C"
+    device_class: temperature
+    state_class: measurement
+    lambda: |-
+      return id(daikin_temp);
+
+text_sensor:
+  - platform: template
+    id: daikin_status_text
+    name: "Điều hòa - Trạng thái"
+    lambda: |-
+      return id(daikin_mode) + " | " + (id(daikin_power) ? "BẬT" : "TẮT") + " | " + id(daikin_temp) + "°C";
+
+  - platform: template
+    id: daikin_raw_rx
+    name: "Điều hòa - Raw RX"
+    lambda: |-
+      return id(rx_buffer);
+
+interval:
+  - interval: 100ms
+    then:
+      # ======== NHẬN DỮ LIỆU TỪ MÁY LẠNH (2-way) ========
+      - lambda: |-
+          while (id(uart_daikin).available()) {
+            uint8_t b = id(uart_daikin).read();
+            char tmp[8];
+            snprintf(tmp, sizeof(tmp), "%02X ", b);
+            id(rx_buffer) += tmp;
+
+            // TODO: Viết parser thực tế theo frame DIII-NET bạn đã quét
+            // Dưới đây là ví dụ cấu trúc giả định, PHẢI THAY THEO THỰC TẾ:
+            //
+            // static uint8_t frame[64];
+            // static int pos = 0;
+            // frame[pos++] = b;
+            // if (pos >= 5 && frame[0] == 0xAA && frame[pos-1] == 0xEE) {
+            //   if (frame[2] == 0x01) { // status frame
+            //     id(daikin_power) = (frame[3] & 0x01);
+            //     id(daikin_mode) = ...;
+            //     id(daikin_temp) = frame[4];
+            //     id(daikin_status_text).publish_state(...);
+            //     id(daikin_temp_sensor).publish_state(...);
+            //   }
+            //   pos = 0;
+            // }
+          }
+
+      # ======== GỬI RAW BUFFER LÊN HA MỖI 5 GIÂY ========
+      - interval: 5s
+        then:
+          - lambda: |-
+              if (!id(rx_buffer).empty()) {
+                id(daikin_raw_rx).publish_state(id(rx_buffer));
+                id(rx_buffer) = "";
+              }
