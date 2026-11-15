@@ -1,0 +1,57 @@
+esphome:
+  name: daikin-ftkc35pvmv-sniffer
+  friendly_name: Daikin Sniffer
+
+esp32:
+  variant: esp32c3
+  framework:
+    type: esp-idf
+
+logger:
+  level: DEBUG
+  baud_rate: 0
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+
+  manual_ip:
+    static_ip: 192.168.1.81
+    gateway: 192.168.1.1
+    subnet: 255.255.255.0
+
+  ap:
+    ssid: "daikin-sniffer"
+    password: "12345678"
+
+api:
+  reboot_timeout: 0s
+  encryption:
+    key: "TheyC99XeQcguRhqrwiyxw2J0Bqq5NYS/kpWR0DlMPA="
+
+ota:
+  platform: esphome
+  password: !secret ota_password
+
+web_server:
+  port: 80
+  version: 3
+
+uart:
+  id: uart_daikin
+  tx_pin: GPIO18
+  rx_pin: GPIO19
+  baud_rate: 9600
+  data_bits: 8
+  parity: NONE
+  stop_bits: 1
+  rx_buffer_size: 256
+
+interval:
+  - interval: 50ms
+    then:
+      - lambda: |-
+          while (id(uart_daikin).available()) {
+            uint8_t b = id(uart_daikin).read();
+            ESP_LOGI("DAIKIN", "RX 0x%02X (%d)", b, b);
+          }
